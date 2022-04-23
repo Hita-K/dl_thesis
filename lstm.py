@@ -63,7 +63,9 @@ signals_test = wfdb.rdrecord(os.path.join(base_dir, names_test[0]), channels=[0]
 def preprocess(labels, signals):
     X = []
     y = []
+    print("LABELS", len(labels))
     for j in range(len(labels)):
+        # print("THIS IS J", j)
         if j < before or (j + 1 + after) > len(signals) / float(sample):
             continue
         # print(len(signals))
@@ -85,7 +87,13 @@ def preprocess(labels, signals):
         # Remove physiologically impossible HR signal
         if np.all(np.logical_and(hr >= hr_min, hr <= hr_max)):
             # Save extracted signal
-            X.append(list(rri_tm) + list(rri_signal) + list(ampl_tm) + list(ampl_siganl))
+            appending = list(rri_tm) + list(rri_signal) + list(ampl_tm) + list(ampl_siganl)
+            appending = appending[:1470]
+            if len(appending) < 1470:
+                zeros = 1470 - len(appending)
+                zeroslist = [0] * zeros
+                appending += zeroslist
+            X.append(appending)
             y.append(0. if labels[j] == 'N' else 1.)
         # X.append([signal])
         # y.append(0. if labels[j] == 'N' else 1.)
@@ -123,7 +131,10 @@ class LSTMECG(nn.Module):
 model = LSTMECG(EMBED_DIM, HIDDEN_DIM)
 loss_function = nn.BCELoss()
 optimizer = optim.SGD(model.parameters(), lr=0.1)
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
+# print([len(X[i]) for i in range(len(X))])
+# X = np.array(X)
+# print(X.shape)
 X = torch.tensor(X, dtype=torch.float32)
 y = torch.tensor(y, dtype=torch.float32)
 
