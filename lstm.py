@@ -1,4 +1,4 @@
-from builtins import breakpoint
+# from builtins import breakpoint
 from re import L
 import torch
 
@@ -19,7 +19,7 @@ import wfdb
 from biosppy.signals.ecg import correct_rpeaks, hamilton_segmenter
 from scipy.signal import medfilt
 # from sklearn.utils import cpu_count
-from tqdm import tqdm
+# from tqdm import tqdm
 
 torch.manual_seed(1)
 
@@ -36,7 +36,7 @@ for i in inputs:
 # print(hidden)
 
 
-base_dir = "data"
+base_dir = "/home/rkambham/physionet.org/files/apnea-ecg/1.0.0"
 
 fs = 100
 sample = fs * 60
@@ -46,24 +46,30 @@ after = 2
 hr_min = 20
 hr_max = 300
 
-names_train = ["a01"]
-names_test = ["x01"]
+names_train = ["a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09", "a10",
+        "a11", "a12", "a13", "a14", "a15", "a16", "a17", "a18", "a19", "a20",
+        "b01", "b02", "b03", "b04", "b05",
+        "c01", "c02", "c03", "c04", "c05", "c06", "c07", "c08", "c09", "c10"]
+        
+names_test = ["x01", "x02", "x03", "x04", "x05", "x06", "x07", "x08", "x09", "x10",
+        "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20",
+        "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30",
+        "x31", "x32", "x33", "x34", "x35"]
 
 
+labels_list_train = []
+signals_list_train = []
+
+labels_list_test = []
+labels_list_test = []
 
 
-labels = wfdb.rdann(os.path.join(base_dir, names_train[0]), extension="apn").symbol
-signals = wfdb.rdrecord(os.path.join(base_dir, names_train[0]), channels=[0]).p_signal[:, 0]
-
-
-labels_test = wfdb.rdann(os.path.join(base_dir, names_test[0]), extension="apn").symbol
-signals_test = wfdb.rdrecord(os.path.join(base_dir, names_test[0]), channels=[0]).p_signal[:, 0]
 
 
 def preprocess(labels, signals):
     X = []
     y = []
-    print("LABELS", len(labels))
+    # print("LABELS", len(labels))
     for j in range(len(labels)):
         # print("THIS IS J", j)
         if j < before or (j + 1 + after) > len(signals) / float(sample):
@@ -73,36 +79,61 @@ def preprocess(labels, signals):
         # print(len(signal))
         signal, _, _ = st.filter_signal(signal, ftype='FIR', band='bandpass', order=int(0.3 * fs),
                                         frequency=[3, 45], sampling_rate=fs)
-        # Find R peaks
-        rpeaks, = hamilton_segmenter(signal, sampling_rate=fs)
-        rpeaks, = correct_rpeaks(signal, rpeaks=rpeaks, sampling_rate=fs, tol=0.1)
-        if len(rpeaks) / (1 + after + before) < 40 or \
-                len(rpeaks) / (1 + after + before) > 200:  # Remove abnormal R peaks signal
-            continue
-        # Extract RRI, Ampl signal
-        rri_tm, rri_signal = rpeaks[1:] / float(fs), np.diff(rpeaks) / float(fs)
-        rri_signal = medfilt(rri_signal, kernel_size=3)
-        ampl_tm, ampl_siganl = rpeaks / float(fs), signal[rpeaks]
-        hr = 60 / rri_signal
-        # Remove physiologically impossible HR signal
-        if np.all(np.logical_and(hr >= hr_min, hr <= hr_max)):
-            # Save extracted signal
-            appending = list(rri_tm) + list(rri_signal) + list(ampl_tm) + list(ampl_siganl)
-            appending = appending[:1470]
-            if len(appending) < 1470:
-                zeros = 1470 - len(appending)
-                zeroslist = [0] * zeros
-                appending += zeroslist
-            X.append(appending)
-            y.append(0. if labels[j] == 'N' else 1.)
-        # X.append([signal])
-        # y.append(0. if labels[j] == 'N' else 1.)
+        # # Find R peaks
+        # rpeaks, = hamilton_segmenter(signal, sampling_rate=fs)
+        # rpeaks, = correct_rpeaks(signal, rpeaks=rpeaks, sampling_rate=fs, tol=0.1)
+        # if len(rpeaks) / (1 + after + before) < 40 or \
+        #         len(rpeaks) / (1 + after + before) > 200:  # Remove abnormal R peaks signal
+        #     continue
+        # # Extract RRI, Ampl signal
+        # rri_tm, rri_signal = rpeaks[1:] / float(fs), np.diff(rpeaks) / float(fs)
+        # rri_signal = medfilt(rri_signal, kernel_size=3)
+        # ampl_tm, ampl_siganl = rpeaks / float(fs), signal[rpeaks]
+        # hr = 60 / rri_signal
+        # # Remove physiologically impossible HR signal
+        # if np.all(np.logical_and(hr >= hr_min, hr <= hr_max)):
+        #     # Save extracted signal
+        #     appending = list(rri_tm) + list(rri_signal) + list(ampl_tm) + list(ampl_siganl)
+        #     appending = appending[:1470]
+        #     if len(appending) < 1470:
+        #         zeros = 1470 - len(appending)
+        #         zeroslist = [0] * zeros
+        #         appending += zeroslist
+        #     X.append(appending)
+        #     y.append(0. if labels[j] == 'N' else 1.)
+        X.append(np.array(signal))
+        y.append(0. if labels[j] == 'N' else 1.)
     return X, y
 
-X, y = preprocess(labels, signals)
-X_test, y_test = preprocess(labels_test, signals_test)
+X_train = []
+y_train = []
+
+X_test = []
+y_test = []
+
+for i in range(len(names_train)):
+    labels = wfdb.rdann(os.path.join(base_dir, names_train[i]), extension="apn").symbol
+    signals = wfdb.rdrecord(os.path.join(base_dir, names_train[i]), channels=[0]).p_signal[:, 0]
+    X, y = preprocess(labels, signals)
+    X = torch.tensor(X, dtype=torch.float32)
+    y = torch.tensor(y, dtype=torch.float32)
+    # print("HII TYPE", X.shape)
+    X_train.append(X)
+    y_train.append(y)
 
 
+
+for i in range(len(names_test)):
+    labels_test = wfdb.rdann(os.path.join(base_dir, names_test[i]), extension="apn").symbol
+    signals_test = wfdb.rdrecord(os.path.join(base_dir, names_test[i]), channels=[0]).p_signal[:, 0]
+    X, y = preprocess(labels_test, signals_test)
+    X = torch.tensor(X, dtype=torch.float32)
+    y = torch.tensor(y, dtype=torch.float32)
+    X_test.append(X)
+    y_test.append(y)
+
+# X = torch.tensor(X, dtype=torch.float32)
+# y = torch.tensor(y, dtype=torch.float32)
 
 EMBED_DIM = 1
 HIDDEN_DIM = 2
@@ -130,16 +161,17 @@ class LSTMECG(nn.Module):
 
 model = LSTMECG(EMBED_DIM, HIDDEN_DIM)
 loss_function = nn.BCELoss()
-optimizer = optim.SGD(model.parameters(), lr=0.1)
+optimizer = optim.Adam(model.parameters(), lr=0.1)
+
 # import pdb; pdb.set_trace()
 # print([len(X[i]) for i in range(len(X))])
 # X = np.array(X)
 # print(X.shape)
-X = torch.tensor(X, dtype=torch.float32)
-y = torch.tensor(y, dtype=torch.float32)
+# X = torch.tensor(X_train, dtype=torch.float32)
+# y = torch.tensor(y_train, dtype=torch.float32)
 
-X_test = torch.tensor(X_test, dtype=torch.float32)
-y_test = torch.tensor(y_test, dtype=torch.float32)
+# X_test = torch.tensor(X_test, dtype=torch.float32)
+# y_test = torch.tensor(y_test, dtype=torch.float32)
 accu = []
 
 # print("X", X)
@@ -148,44 +180,44 @@ accu = []
 # wfbd in seperate function
 for epoch in range(50):
     print("In Epoch", epoch)
-    for sig, lab in zip(X, y):
-        # print("in for")
+    for (x, y) in zip(X_train, y_train):
+        for sig, lab in zip(X, y):
+            # print("in for")
 
-        # clear gradients
-        model.zero_grad()
-        # print("finished zero grad")
+            # clear gradients
+            model.zero_grad()
+            # print("finished zero grad")
+            # print(sig.shape)
+            # forward pass 
+            sigT = sig.t()
+            
+            ecg_scores = model(sig.unsqueeze(0))
+            # ecg_scores = ecg_scores.item()
+            lab = lab.unsqueeze(0).unsqueeze(0) #torch.tensor(lab)
 
-        # forward pass 
-        sigT = sig.t()
-        
-        ecg_scores = model(sig.unsqueeze(0))
-        # ecg_scores = ecg_scores.item()
-        lab = lab.unsqueeze(0).unsqueeze(0) #torch.tensor(lab)
+            # loss, gradient, update params 
 
-        # print("ecg_scores")
-        # loss, gradient, update params 
-        # print("ecg_scores", ecg_scores)
-        # print(lab)
-        loss = loss_function(ecg_scores, lab)
-        loss.backward() # only do when there is a label 
-        # print("loss")
-        optimizer.step()
-        # print("optimizer")
+            loss = loss_function(ecg_scores, lab)
+            loss.backward() # only do when there is a label 
+            # print("loss")
+            optimizer.step()
+            # print("optimizer")
 
     if epoch % 5 == 0:
         with torch.no_grad():
             acc = 0
             total = 0
-            for sig, lab in zip(X_test, y_test):
-                total += 1
-                # sigT = sig.t()
-                score = model(sig.unsqueeze(0))
-                if score > 0.5: score = 1
-                else: score = 0
-                print(score, lab)
-                if score == lab:
-                    acc += 1
-            print(acc/total)
+            for (xt, yt) in zip(X_test, y_test):
+                for sig, lab in zip(xt, yt):
+                    total += 1
+                    # sigT = sig.t()
+                    score = model(sig.unsqueeze(0))
+                    if score > 0.5: score = 1
+                    else: score = 0
+                    # print(score, lab)
+                    if score == lab:
+                        acc += 1
+            print("ACCURACY", acc/total)
             accu.append(acc/total)
 
 # torch save dict
