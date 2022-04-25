@@ -46,15 +46,15 @@ after = 2
 hr_min = 20
 hr_max = 300
 
-names_train = ["a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09", "a10",
-        "a11", "a12", "a13", "a14", "a15", "a16", "a17", "a18", "a19", "a20",
-        "b01", "b02", "b03", "b04", "b05",
-        "c01", "c02", "c03", "c04", "c05", "c06", "c07", "c08", "c09", "c10"]
+names_train = ["a01", "a02", "a03"] # "a04", "a05", "a06", "a07", "a08", "a09", "a10",
+        # "a11", "a12", "a13", "a14", "a15", "a16", "a17", "a18", "a19", "a20",
+        # "b01", "b02", "b03", "b04", "b05",
+        # "c01", "c02", "c03", "c04", "c05", "c06", "c07", "c08", "c09", "c10"]
         
-names_test = ["x01", "x02", "x03", "x04", "x05", "x06", "x07", "x08", "x09", "x10",
-        "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20",
-        "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30",
-        "x31", "x32", "x33", "x34", "x35"]
+names_test = ["x01", "x02", "x03"] # "x04", "x05", "x06", "x07", "x08", "x09", "x10",
+        # "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20",
+        # "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30",
+        # "x31", "x32", "x33", "x34", "x35"]
 
 
 labels_list_train = []
@@ -103,6 +103,8 @@ def preprocess(labels, signals):
         #     y.append(0. if labels[j] == 'N' else 1.)
         X.append(np.array(signal))
         y.append(0. if labels[j] == 'N' else 1.)
+    X = np.array(X)
+    y = np.array(y)
     return X, y
 
 X_train = []
@@ -136,7 +138,7 @@ for i in range(len(names_test)):
 # y = torch.tensor(y, dtype=torch.float32)
 
 EMBED_DIM = 1
-HIDDEN_DIM = 2
+HIDDEN_DIM = 5
 
 # in forward, call lstm
 # nn.linear (hidden_dim, 1)
@@ -151,7 +153,7 @@ class LSTMECG(nn.Module):
         self.lstm = nn.LSTM(embedding_dim, hidden_dim)
         self.hidden = nn.Linear(hidden_dim, 1)
     def forward(self, sig):
-        # print("HII",sig.shape)
+        print("HII",sig.shape, sig.view(sig.shape[0], sig.shape[-1], -1).shape)
         lstm_out, _ = self.lstm(sig.view(sig.shape[0], sig.shape[-1], -1))
         lstm_out = lstm_out[:, -1, :] #.unsqueeze(0)
         # print(lstm_out.shape)
@@ -161,7 +163,7 @@ class LSTMECG(nn.Module):
 
 model = LSTMECG(EMBED_DIM, HIDDEN_DIM)
 loss_function = nn.BCELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.1)
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 
 # import pdb; pdb.set_trace()
 # print([len(X[i]) for i in range(len(X))])
@@ -182,10 +184,11 @@ for epoch in range(50):
     print("In Epoch", epoch)
     for (x, y) in zip(X_train, y_train):
         for sig, lab in zip(X, y):
+            model.zero_grad()
             # print("in for")
 
             # clear gradients
-            model.zero_grad()
+            # model.zero_grad()
             # print("finished zero grad")
             # print(sig.shape)
             # forward pass 
@@ -198,10 +201,12 @@ for epoch in range(50):
             # loss, gradient, update params 
 
             loss = loss_function(ecg_scores, lab)
+            # print("LOSS", loss)
             loss.backward() # only do when there is a label 
             # print("loss")
             optimizer.step()
             # print("optimizer")
+        # print("LOSS", loss)
 
     if epoch % 5 == 0:
         with torch.no_grad():
@@ -212,6 +217,9 @@ for epoch in range(50):
                     total += 1
                     # sigT = sig.t()
                     score = model(sig.unsqueeze(0))
+                    lab = lab.unsqueeze(0).unsqueeze(0)
+                    loss = loss_function(score, lab)
+                    # print("LOSS", loss)
                     if score > 0.5: score = 1
                     else: score = 0
                     # print(score, lab)
